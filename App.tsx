@@ -30,7 +30,8 @@ import Testimonials from './pages/Testimonials';
 import { User, StaffUser } from './types';
 import { authService } from './services/api';
 import { Loader2 } from 'lucide-react';
-import { Analytics } from "@vercel/analytics/react";
+
+const Analytics = () => null;
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();

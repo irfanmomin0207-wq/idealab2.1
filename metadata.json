@@ -1,5 +1,6 @@
 {
   "name": "AICTE IDEA Lab",
   "description": "An ultra-sleek, modern academic platform for AICTE IDEA Lab featuring events, galleries, and a futuristic user interface.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

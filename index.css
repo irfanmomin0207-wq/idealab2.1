@@ -1,0 +1,7 @@
+/* AICTE IDEA Lab Base Styles */
+@layer base {
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}

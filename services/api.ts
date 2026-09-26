@@ -3,7 +3,7 @@ import { User, StaffUser, Event, Project, InventoryItem, Indent, PrintOrder, Pcb
 import { EVENTS, PROJECTS } from '../constants';
 
 const DELAY = 500;
-const API_URL = (import.meta as any)?.env?.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = (import.meta as any)?.env?.VITE_API_URL || '/api';
 
 const getStorage = <T>(key: string, defaultVal: T): T => {
   const stored = localStorage.getItem(key);
@@ -137,7 +137,7 @@ export const authService = {
 
   loginWithMicrosoft: async (userType: 'university' | 'non-university' = 'university'): Promise<User> => {
     try {
-      const API_BASE = 'http://localhost:3001/api';
+      const API_BASE = API_URL;
       
       console.log('Fetching Microsoft auth URL from:', `${API_BASE}/auth/microsoft`);
       

@@ -42,19 +42,24 @@ const upload = multer({
   }
 });
 
-// Load environment variables from .env.local
-const envPath = path.join(__dirname, '.env.local');
-const envContent = fs.readFileSync(envPath, 'utf-8');
-const envLines = envContent.split('\n');
-const env = {};
-
-envLines.forEach(line => {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith('#') && trimmed.includes('=')) {
-    const [key, ...valueParts] = trimmed.split('=');
-    env[key.trim()] = valueParts.join('=').trim();
+// Load environment variables safely
+const env = { ...process.env };
+try {
+  const envPath = path.join(__dirname, '.env.local');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf-8');
+    const envLines = envContent.split('\n');
+    envLines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('#') && trimmed.includes('=')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        env[key.trim()] = valueParts.join('=').trim();
+      }
+    });
   }
-});
+} catch (e) {
+  console.warn('Could not read .env.local, using process.env');
+}
 
 console.log('Environment loaded:', {
   GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? '✓' : '✗',
@@ -850,6 +855,68 @@ app.post('/api/stl/price', (req, res) => {
   } catch (error) {
     console.error('[STL Price] Error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Price calculation failed' });
+  }
+});
+
+// ============================================================================
+// PCB BUILDER ROUTES
+// ============================================================================
+
+const pcbOptionsPath = path.join(__dirname, 'api', 'pcb', 'options.json');
+let pcbOptions = null;
+try {
+  if (fs.existsSync(pcbOptionsPath)) {
+    pcbOptions = JSON.parse(fs.readFileSync(pcbOptionsPath, 'utf-8'));
+  }
+} catch (e) {
+  console.warn('Could not read pcb options.json:', e.message);
+}
+
+app.get('/api/pcb/builder', (req, res) => {
+  res.json({ success: true, options: pcbOptions || {} });
+});
+
+app.post('/api/pcb/builder', (req, res) => {
+  try {
+    const { width, height, layerCount, color, copperThickness } = req.body || {};
+    if (!width || !height || !layerCount || !color || !copperThickness) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: width, height, layerCount, color, copperThickness'
+      });
+    }
+
+    const boardAreaCm2 = (width / 10) * (height / 10);
+    const basePricePerCm2 = 15;
+    
+    const colorOpt = pcbOptions?.colors?.find(c => c.id === color);
+    const copperOpt = pcbOptions?.copperThickness?.find(c => c.id === copperThickness);
+    const layerOpt = pcbOptions?.layerCount?.find(l => l.value === layerCount);
+    
+    const totalMultiplier = (colorOpt?.priceMultiplier || 1) * (copperOpt?.priceMultiplier || 1) * (layerOpt?.priceMultiplier || 1);
+    const basePrice = boardAreaCm2 * basePricePerCm2 * totalMultiplier;
+    
+    const thicknessMm = (copperOpt?.micrometers || 35) / 1000;
+    const copperUsageGrams = parseFloat((((width * height) * thicknessMm * 8.96 / 1000) * layerCount).toFixed(2));
+
+    res.json({
+      success: true,
+      specification: req.body,
+      calculations: {
+        boardAreaCm2: parseFloat(boardAreaCm2.toFixed(2)),
+        boardAreaMm2: parseFloat((boardAreaCm2 * 100).toFixed(2)),
+        copperUsageGrams,
+        estimatedPriceINR: Math.round(basePrice),
+        priceBreakdown: {
+          basePrice: parseFloat(basePrice.toFixed(2)),
+          sgst: parseFloat((basePrice * 0.09).toFixed(2)),
+          cgst: parseFloat((basePrice * 0.09).toFixed(2)),
+          totalWithGST: parseFloat((basePrice * 1.18).toFixed(2))
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

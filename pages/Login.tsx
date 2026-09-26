@@ -76,14 +76,35 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError(null);
     setLoading(true);
 
+    // Fallback to mock OTP if Firebase is not configured with an API key
+    if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+      try {
+        await authService.sendOtp(`+91${phoneNumber}`);
+        setStep('otp');
+      } catch (err: any) {
+        setError(err.message || "Failed to send OTP");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     // Ensure reCAPTCHA is set up before sending OTP
     if (!recaptchaVerifier) {
       try {
         const verifier = setupRecaptcha("recaptcha-container");
         setRecaptchaVerifier(verifier);
       } catch (err: any) {
-        setError(err.message || "Failed to setup reCAPTCHA.");
-        setLoading(false);
+        // If recaptcha setup fails (e.g. invalid config), fallback to mock OTP
+        console.warn("reCAPTCHA setup failed, falling back to mock OTP:", err);
+        try {
+          await authService.sendOtp(`+91${phoneNumber}`);
+          setStep('otp');
+        } catch (mErr: any) {
+          setError(mErr.message || "Failed to send OTP");
+        } finally {
+          setLoading(false);
+        }
         return;
       }
     }
@@ -114,7 +135,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setLoading(true);
       setError(null); // Clear previous errors
 
-      if (!confirmationResult || !recaptchaVerifier) {
+      if (!confirmationResult) {
+        // Fallback to local auth verification
+        try {
+          const user = await authService.verifyOtpAndLogin(`+91${phoneNumber}`, otp, selectedRole || 'non-university');
+          onLogin(user);
+          navigate('/dashboard');
+        } catch (err: any) {
+          setError(err.message || "Invalid OTP. Default test code is '123456'.");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      if (!recaptchaVerifier) {
         setError("OTP request not initiated or reCAPTCHA not set up.");
         setLoading(false);
         return;
